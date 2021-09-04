@@ -11,7 +11,9 @@
 #define USART         USART2
 #define USART_GPIO GPIO2
 #define USART_AF GPIO_AF7
-#define USART_BAUD 4800
+#define USART_BAUD 115200
+
+#define I2C_SLAVE_ADDR 0x69  // 105d
 
 
 void sys_tick_handler(void);
@@ -26,11 +28,17 @@ static void systick_setup(void) {
     systick_counter_enable();
 }
 
-static void usart_setup(void) {
+static void rcc_setup(void) {
+    rcc_periph_clock_enable(RCC_GPIOA);
+    rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USART);
+}
+
+
+static void usart_setup(void) {
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, USART_GPIO);
     gpio_set_af(GPIOA, USART_AF, USART_GPIO);
-    usart_set_baudrate(USART, 4800);
+    usart_set_baudrate(USART, USART_BAUD);
     usart_set_databits(USART, 8);
     usart_set_parity(USART, USART_PARITY_NONE);
     usart_set_stopbits(USART, USART_CR2_STOPBITS_1);
@@ -68,10 +76,7 @@ void delay(uint64_t duration) {
 
 
 int main(void) {
-    // Since our LED is on GPIO bank B, we need to enable
-    // the peripheral clock to this GPIO bank in order to use it.
-    rcc_periph_clock_enable(RCC_GPIOB);
-    rcc_periph_clock_enable(RCC_GPIOA);
+    rcc_setup();
 
     // Our test LED is connected to Port B pin 3, so let's set it as output
     gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO3);
