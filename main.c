@@ -26,6 +26,9 @@
 #define I2C_OTYPE GPIO_OTYPE_OD
 #define I2C_GPIO_SPEED GPIO_OSPEED_50MHZ
 
+// opencm3 randomly breaks convention for this particular setting
+#define I2C_OAR1_OA1EN I2C_OAR1_OA1EN_ENABLE
+
 
 
 static volatile uint64_t _millis = 0;
@@ -46,7 +49,7 @@ static void rcc_setup(void) {
 }
 
 static void i2c_setup(void) {
-    //nvic_enable_irq(NVIC_I2C1_EV_IRQ);
+    nvic_enable_irq(NVIC_I2C1_EV_IRQ);
 
     gpio_mode_setup(
             I2C_PORT, GPIO_MODE_AF, GPIO_PUPD_NONE,
@@ -63,10 +66,14 @@ static void i2c_setup(void) {
     i2c_set_digital_filter(I2C, 0);
 
     i2c_set_speed(I2C, i2c_speed_sm_100k, rcc_apb1_frequency / 1e6);
-    //i2c_set_own_7bit_slave_address(I2C, I2C_SLAVE_ADDR);
-    //i2c_enable_interrupt(
-    //        I2C, 
-    //        I2C_CR1_ADDRIE | I2C_CR1_RXIE);
+    i2c_set_own_7bit_slave_address(I2C, I2C_SLAVE_ADDR);
+
+    // OAR1 is disabled by default, we must enable it to ACK address matches
+    I2C_OAR1(I2C) |= I2C_OAR1_OA1EN;
+
+    i2c_enable_interrupt(
+            I2C, 
+            I2C_CR1_ADDRIE | I2C_CR1_RXIE);
 
     i2c_peripheral_enable(I2C);
 }
@@ -126,7 +133,6 @@ void i2c1_ev_isr(void) {
 
 int main(void) {
     rcc_setup();
-
     // Our test LED is connected to Port B pin 3, so let's set it as output
     gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO3);
 
@@ -136,16 +142,16 @@ int main(void) {
 
     i2c_setup();
 
-    uint8_t addr = 0x20;
-    uint8_t cmd = 0x42;
-    uint8_t data;
-
     // Now, let's forever toggle this LED back and forth
     while (true) {
         uart_putln("LED toggle");
         gpio_toggle(GPIOB, GPIO3);
-        uart_putln("i2c send");
-        i2c_transfer7(I2C, addr, &cmd, 1, &data, 1);
+        if(I2C_OAR1(I2C) & I2C_OAR1_OA1EN_ENABLE) {
+            uart_putln("oar1 enabled");
+        } else {
+            uart_putln("oar1 disabled");
+        }
+
 
         delay(1000);
     }
